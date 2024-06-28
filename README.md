@@ -6,7 +6,7 @@ This Python script fetches and analyzes metrics for a specified GitHub organizat
 
 - Fetches data for all repositories in a specified GitHub organization
 - Analyzes developer activity (commits, lines added/deleted)
-- Provides detailed repository metrics (activity, stars, forks, etc.)
+- Provides detailed repository metrics (activity, creation date, last update, language, etc.)
 - Caches data to reduce API calls and allow for quick re-analysis
 - Outputs results to CSV files for further analysis
 
@@ -82,17 +82,17 @@ The script generates two CSV files:
 1. `<org_name>_github_developer_metrics.csv`: Contains metrics for each developer, including:
    - Number of commits
    - Lines added and deleted
-   - Repositories contributed to
+   - Top 8 repositories contributed to (sorted by number of commits)
 
 2. `<org_name>_github_repository_metrics.csv`: Contains metrics for each repository, including:
+   - Repository name
    - Activity level (number of commits)
    - Creation and last update dates
    - Primary programming language
-   - Number of stars and forks
-   - Repository size
-   - Number of branches and contributors
-   - Number of releases
-   - Presence and size of README file
+   - Number of branches
+   - Number of contributors
+
+The script also prints a formatted version of these results to the console.
 
 ## Caching
 
@@ -110,7 +110,6 @@ The script uses a JSON file (`<org_name>_github_data_cache.json`) to store raw d
 - The script may take a while to run for large organizations with many repositories.
 - It's subject to GitHub API rate limits.
 - Some data may not be available depending on the permissions of your Personal Access Token.
-- The script does not collect or analyze issues data.
 
 ## Troubleshooting
 
@@ -122,3 +121,7 @@ If you encounter issues:
    ```
    pip install --upgrade -r requirements.txt
    ```
+
+## License
+
+This project is open-source and available under the MIT License.

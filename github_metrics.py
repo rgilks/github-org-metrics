@@ -132,7 +132,7 @@ def analyze_data(data, since):
     commit_counts = defaultdict(int)
     lines_added = defaultdict(int)
     lines_deleted = defaultdict(int)
-    repos_worked_on = defaultdict(set)
+    repos_worked_on = defaultdict(lambda: defaultdict(int))
     repo_activity = defaultdict(int)
     repo_details = []
     
@@ -140,18 +140,11 @@ def analyze_data(data, since):
         repo_name = repo['name']
         repo_details.append({
             'name': repo_name,
-            'private': repo['private'],
-            'created_at': repo['created_at'],
-            'updated_at': repo['updated_at'],
-            'language': repo['language'],
-            'stars': repo['stargazers_count'],
-            'forks': repo['forks_count'],
-            'size': repo['size'],
+            'created_at': datetime.strptime(repo['created_at'], "%Y-%m-%dT%H:%M:%SZ").strftime("%B %d, %Y"),
+            'updated_at': datetime.strptime(repo['updated_at'], "%Y-%m-%dT%H:%M:%SZ").strftime("%B %d, %Y"),
+            'language': repo['language'] or 'N/A',
             'branch_count': len(data['branches'][repo_name]),
             'contributor_count': len(data['contributors'][repo_name]),
-            'release_count': len(data['releases'][repo_name]),
-            'has_readme': data['readme'][repo_name] is not None,
-            'readme_size': len(data['readme'][repo_name]) if data['readme'][repo_name] else 0
         })
         
         for commit in data['commits'][repo_name]:
@@ -159,7 +152,7 @@ def analyze_data(data, since):
                 if commit['author'] and 'login' in commit['author']:
                     author = commit['author']['login']
                     commit_counts[author] += 1
-                    repos_worked_on[author].add(repo_name)
+                    repos_worked_on[author][repo_name] += 1
                     repo_activity[repo_name] += 1
                     
                     stats = data['commit_stats'][repo_name].get(commit['sha'])
@@ -167,26 +160,57 @@ def analyze_data(data, since):
                         lines_added[author] += stats['additions']
                         lines_deleted[author] += stats['deletions']
 
+    def format_repos(repos_dict):
+        sorted_repos = sorted(repos_dict.items(), key=lambda x: x[1], reverse=True)
+        if len(sorted_repos) <= 5:
+            return ', '.join(repo for repo, _ in sorted_repos)
+        else:
+            top_5 = ', '.join(repo for repo, _ in sorted_repos[:5])
+            remaining = len(sorted_repos) - 5
+            return f"{top_5} +{remaining} more"
+
     df_developers = pd.DataFrame({
         'Developer': list(commit_counts.keys()),
         'Commits': list(commit_counts.values()),
         'Lines Added': [lines_added[dev] for dev in commit_counts.keys()],
         'Lines Deleted': [lines_deleted[dev] for dev in commit_counts.keys()],
-        'Repositories': [', '.join(repos_worked_on[dev]) for dev in commit_counts.keys()]
+        'Repositories': [format_repos(repos_worked_on[dev]) for dev in commit_counts.keys()]
     })
 
     df_developers = df_developers.sort_values('Commits', ascending=False)
 
     df_repos = pd.DataFrame(repo_details)
     df_repos['Activity'] = df_repos['name'].map(repo_activity)
+    df_repos = df_repos[['name', 'Activity', 'created_at', 'updated_at', 'language', 'branch_count', 'contributor_count']]
     df_repos = df_repos.sort_values('Activity', ascending=False)
+
+    # Format the DataFrames for better readability
+    pd.set_option('display.max_colwidth', None)
+    
+    developer_formatters = {
+        'Developer': lambda x: f'{x:<20}',
+        'Commits': lambda x: f'{x:>7}',
+        'Lines Added': lambda x: f'{x:>11}',
+        'Lines Deleted': lambda x: f'{x:>13}',
+        'Repositories': lambda x: f'{x}'
+    }
+
+    repo_formatters = {
+        'name': lambda x: f'{x:<30}',
+        'Activity': lambda x: f'{x:>8}',
+        'created_at': lambda x: f'{x:>20}',
+        'updated_at': lambda x: f'{x:>20}',
+        'language': lambda x: f'{x:<10}',
+        'branch_count': lambda x: f'{x:>12}',
+        'contributor_count': lambda x: f'{x:>18}'
+    }
 
     print("\nFinal Results:")
     print(f"Total Repositories Processed: {len(data['repos'])}")
     print("\nDeveloper Activity:")
-    print(df_developers)
+    print(df_developers.to_string(index=False, formatters=developer_formatters, justify='left'))
     print("\nRepository Details:")
-    print(df_repos)
+    print(df_repos.to_string(index=False, formatters=repo_formatters, justify='left'))
 
     return df_developers, df_repos
 
@@ -237,4 +261,3 @@ if __name__ == "__main__":
     print(f"Using token: {GITHUB_TOKEN[:4]}...{GITHUB_TOKEN[-4:]}")
     print(f"Organization: {args.org}")
     main(args.org, use_cache=args.use_cache, update_cache=args.update_cache)
-
