@@ -16,6 +16,23 @@ This Python script fetches and analyzes metrics for a specified GitHub organizat
 - Git (for cloning the repository)
 - GitHub Personal Access Token with appropriate permissions
 
+## Installing Python
+
+If you are on macos install homebrew is it's not already installed
+```
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Install python3.8
+```
+brew install python@3.8
+```
+
+Install pip
+```
+python3.8 -m pip install --upgrade pip
+```   
+
 ## Installation and Setup
 
 1. Clone the repository:
@@ -32,7 +49,7 @@ This Python script fetches and analyzes metrics for a specified GitHub organizat
 
 3. Install the required dependencies:
    ```
-   pip install -r requirements.txt
+   pip3 install -r requirements.txt
    ```
 
 4. Set up your GitHub Personal Access Token:
@@ -53,7 +70,7 @@ This Python script fetches and analyzes metrics for a specified GitHub organizat
 Ensure your virtual environment is activated, then run the script using the following command:
 
 ```
-python github_metrics.py <organization_name> [--use-cache] [--update-cache]
+python3.8 github_metrics.py <organization_name> [--use-cache] [--update-cache]
 ```
 
 Arguments:
@@ -64,15 +81,15 @@ Arguments:
 Examples:
 - To fetch new data for an organization:
   ```
-  python github_metrics.py MyOrgName
+  python3.8 github_metrics.py MyOrgName
   ```
 - To use cached data (if available):
   ```
-  python github_metrics.py MyOrgName --use-cache
+  python3.8 github_metrics.py MyOrgName --use-cache
   ```
 - To update the cache with fresh data:
   ```
-  python github_metrics.py MyOrgName --update-cache
+  python3.8 github_metrics.py MyOrgName --update-cache
   ```
 
 ## Output
@@ -119,7 +136,7 @@ If you encounter issues:
 3. For large organizations, consider running the script in parts or reducing the time range analyzed.
 4. If you're having dependency issues, try updating your dependencies:
    ```
-   pip install --upgrade -r requirements.txt
+   pip3 install --upgrade -r requirements.txt
    ```
 
 ## License
