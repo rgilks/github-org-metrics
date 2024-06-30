@@ -20,8 +20,8 @@ This Python script fetches and analyzes metrics for a specified GitHub organizat
 
 1. Clone the repository:
    ```
-   git clone https://github.com/your-username/github-org-metrics.git
-   cd github-org-metrics
+   git clone https://github.com/your-username/github-org-metrics-python.git
+   cd github-org-metrics-python
    ```
 
 2. Create and activate a virtual environment:
