@@ -91,6 +91,29 @@ def get_readme(org, repo):
         return base64.b64decode(readme_data['content']).decode('utf-8')
     return None
 
+def get_pull_requests(org, repo, state='all'):
+    pull_requests = []
+    page = 1
+    while True:
+        url = f"{GITHUB_API_URL}/repos/{org}/{repo}/pulls?state={state}&page={page}&per_page=100"
+        page_prs = make_request(url)
+        if not page_prs:
+            break
+        pull_requests.extend(page_prs)
+        if len(page_prs) < 100:
+            break
+        page += 1
+    print(f"Total pull requests for {repo}: {len(pull_requests)}")
+    return pull_requests
+
+def get_pull_request_reviews(org, repo, pr_number):
+    url = f"{GITHUB_API_URL}/repos/{org}/{repo}/pulls/{pr_number}/reviews"
+    return make_request(url)
+
+def get_pull_request_comments(org, repo, pr_number):
+    url = f"{GITHUB_API_URL}/repos/{org}/{repo}/pulls/{pr_number}/comments"
+    return make_request(url)
+
 def fetch_data(org, since):
     data = {
         'repos': get_org_repos(org),
@@ -99,7 +122,10 @@ def fetch_data(org, since):
         'branches': {},
         'contributors': {},
         'releases': {},
-        'readme': {}
+        'readme': {},
+        'pull_requests': {},
+        'pr_reviews': {},
+        'pr_comments': {}
     }
     
     for repo in data['repos']:
@@ -113,20 +139,15 @@ def fetch_data(org, since):
         data['contributors'][repo_name] = get_contributors(org, repo_name)
         data['releases'][repo_name] = get_releases(org, repo_name)
         data['readme'][repo_name] = get_readme(org, repo_name)
+        data['pull_requests'][repo_name] = get_pull_requests(org, repo_name)
+        data['pr_reviews'][repo_name] = {}
+        data['pr_comments'][repo_name] = {}
+        for pr in data['pull_requests'][repo_name]:
+            pr_number = pr['number']
+            data['pr_reviews'][repo_name][pr_number] = get_pull_request_reviews(org, repo_name, pr_number)
+            data['pr_comments'][repo_name][pr_number] = get_pull_request_comments(org, repo_name, pr_number)
     
     return data
-
-def save_cache(data, org):
-    cache_file = f"{org}_{CACHE_FILE}"
-    with open(cache_file, 'w') as f:
-        json.dump(data, f)
-
-def load_cache(org):
-    cache_file = f"{org}_{CACHE_FILE}"
-    if os.path.exists(cache_file):
-        with open(cache_file, 'r') as f:
-            return json.load(f)
-    return None
 
 def analyze_data(data, since):
     commit_counts = defaultdict(int)
@@ -135,6 +156,12 @@ def analyze_data(data, since):
     repos_worked_on = defaultdict(lambda: defaultdict(int))
     repo_activity = defaultdict(int)
     repo_details = []
+    
+    pr_counts = defaultdict(int)
+    pr_reviews = defaultdict(int)
+    pr_comments = defaultdict(int)
+    pr_merge_times = []
+    branch_lifetimes = []
     
     for repo in data['repos']:
         repo_name = repo['name']
@@ -159,6 +186,31 @@ def analyze_data(data, since):
                     if stats:
                         lines_added[author] += stats['additions']
                         lines_deleted[author] += stats['deletions']
+        
+        for pr in data['pull_requests'][repo_name]:
+            if pr['user'] and 'login' in pr['user']:
+                author = pr['user']['login']
+                pr_counts[author] += 1
+                
+                if pr['merged_at']:
+                    created_at = datetime.strptime(pr['created_at'], "%Y-%m-%dT%H:%M:%SZ")
+                    merged_at = datetime.strptime(pr['merged_at'], "%Y-%m-%dT%H:%M:%SZ")
+                    pr_merge_times.append((merged_at - created_at).total_seconds() / 3600)  # in hours
+                    
+                    # Calculate branch lifetime
+                    branch_created_at = datetime.strptime(pr['head']['repo']['created_at'], "%Y-%m-%dT%H:%M:%SZ")
+                    branch_lifetimes.append((merged_at - branch_created_at).total_seconds() / 3600)  # in hours
+            
+            pr_number = pr['number']
+            for review in data['pr_reviews'][repo_name].get(pr_number, []):
+                if review['user'] and 'login' in review['user']:
+                    reviewer = review['user']['login']
+                    pr_reviews[reviewer] += 1
+            
+            for comment in data['pr_comments'][repo_name].get(pr_number, []):
+                if comment['user'] and 'login' in comment['user']:
+                    commenter = comment['user']['login']
+                    pr_comments[commenter] += 1
 
     def format_repos(repos_dict):
         sorted_repos = sorted(repos_dict.items(), key=lambda x: x[1], reverse=True)
@@ -174,6 +226,9 @@ def analyze_data(data, since):
         'Commits': list(commit_counts.values()),
         'Lines Added': [lines_added[dev] for dev in commit_counts.keys()],
         'Lines Deleted': [lines_deleted[dev] for dev in commit_counts.keys()],
+        'PRs Opened': [pr_counts[dev] for dev in commit_counts.keys()],
+        'PRs Reviewed': [pr_reviews[dev] for dev in commit_counts.keys()],
+        'PR Comments': [pr_comments[dev] for dev in commit_counts.keys()],
         'Repositories': [format_repos(repos_worked_on[dev]) for dev in commit_counts.keys()]
     })
 
@@ -184,6 +239,10 @@ def analyze_data(data, since):
     df_repos = df_repos[['name', 'Activity', 'created_at', 'updated_at', 'language', 'branch_count', 'contributor_count']]
     df_repos = df_repos.sort_values('Activity', ascending=False)
 
+    # Calculate averages
+    avg_pr_merge_time = sum(pr_merge_times) / len(pr_merge_times) if pr_merge_times else 0
+    avg_branch_lifetime = sum(branch_lifetimes) / len(branch_lifetimes) if branch_lifetimes else 0
+
     # Format the DataFrames for better readability
     pd.set_option('display.max_colwidth', None)
     
@@ -192,6 +251,9 @@ def analyze_data(data, since):
         'Commits': lambda x: f'{x:>7}',
         'Lines Added': lambda x: f'{x:>11}',
         'Lines Deleted': lambda x: f'{x:>13}',
+        'PRs Opened': lambda x: f'{x:>10}',
+        'PRs Reviewed': lambda x: f'{x:>12}',
+        'PR Comments': lambda x: f'{x:>11}',
         'Repositories': lambda x: f'{x}'
     }
 
@@ -207,12 +269,26 @@ def analyze_data(data, since):
 
     print("\nFinal Results:")
     print(f"Total Repositories Processed: {len(data['repos'])}")
+    print(f"\nAverage PR Merge Time: {avg_pr_merge_time:.2f} hours")
+    print(f"Average Branch Lifetime: {avg_branch_lifetime:.2f} hours")
     print("\nDeveloper Activity:")
     print(df_developers.to_string(index=False, formatters=developer_formatters, justify='left'))
     print("\nRepository Details:")
     print(df_repos.to_string(index=False, formatters=repo_formatters, justify='left'))
 
     return df_developers, df_repos
+
+def save_cache(data, org):
+    cache_file = f"{org}_{CACHE_FILE}"
+    with open(cache_file, 'w') as f:
+        json.dump(data, f)
+
+def load_cache(org):
+    cache_file = f"{org}_{CACHE_FILE}"
+    if os.path.exists(cache_file):
+        with open(cache_file, 'r') as f:
+            return json.load(f)
+    return None
 
 def main(org, use_cache=False, update_cache=False):
     if use_cache and not update_cache:

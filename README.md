@@ -37,8 +37,8 @@ python3.8 -m pip install --upgrade pip
 
 1. Clone the repository:
    ```
-   git clone https://github.com/your-username/github-org-metrics-python.git
-   cd github-org-metrics-python
+   git clone https://github.com/your-username/github-org-metrics.git
+   cd github-org-metrics
    ```
 
 2. Create and activate a virtual environment:
