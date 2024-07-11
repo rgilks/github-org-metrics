@@ -6,7 +6,6 @@ from collections import defaultdict
 import time
 import json
 import argparse
-import base64
 
 # GitHub API configuration
 GITHUB_API_URL = "https://api.github.com"
@@ -33,22 +32,21 @@ def make_request(url):
             print(f"Response content: {response.text}")
             return None
 
-def get_org_repos(org):
+def get_org_repos(org, since):
     repos = []
     page = 1
     while True:
-        url = f"{GITHUB_API_URL}/orgs/{org}/repos?page={page}&per_page=100&type=all"
+        url = f"{GITHUB_API_URL}/orgs/{org}/repos?page={page}&per_page=100&type=all&sort=pushed&direction=desc"
         print(f"Fetching: {url}")
         page_repos = make_request(url)
         if not page_repos:
             break
-        repos.extend(page_repos)
-        print(f"Retrieved {len(page_repos)} repositories on page {page}")
-        if len(page_repos) < 100:
+        repos.extend([repo for repo in page_repos if repo['pushed_at'] >= since])
+        print(f"Retrieved {len(repos)} repositories updated since {since}")
+        if len(page_repos) < 100 or len(repos) >= 20:
             break
         page += 1
-    print(f"Total repositories found: {len(repos)}")
-    return repos
+    return repos[:20]  # Return only the top 20 repos
 
 def get_commits(org, repo, since):
     commits = []
@@ -80,17 +78,6 @@ def get_contributors(org, repo):
     url = f"{GITHUB_API_URL}/repos/{org}/{repo}/contributors"
     return make_request(url)
 
-def get_releases(org, repo):
-    url = f"{GITHUB_API_URL}/repos/{org}/{repo}/releases"
-    return make_request(url)
-
-def get_readme(org, repo):
-    url = f"{GITHUB_API_URL}/repos/{org}/{repo}/readme"
-    readme_data = make_request(url)
-    if readme_data and 'content' in readme_data:
-        return base64.b64decode(readme_data['content']).decode('utf-8')
-    return None
-
 def get_pull_requests(org, repo, state='all'):
     pull_requests = []
     page = 1
@@ -116,13 +103,11 @@ def get_pull_request_comments(org, repo, pr_number):
 
 def fetch_data(org, since):
     data = {
-        'repos': get_org_repos(org),
+        'repos': get_org_repos(org, since),
         'commits': {},
         'commit_stats': {},
         'branches': {},
         'contributors': {},
-        'releases': {},
-        'readme': {},
         'pull_requests': {},
         'pr_reviews': {},
         'pr_comments': {}
@@ -137,8 +122,6 @@ def fetch_data(org, since):
             data['commit_stats'][repo_name][commit['sha']] = get_commit_stats(org, repo_name, commit['sha'])
         data['branches'][repo_name] = get_branches(org, repo_name)
         data['contributors'][repo_name] = get_contributors(org, repo_name)
-        data['releases'][repo_name] = get_releases(org, repo_name)
-        data['readme'][repo_name] = get_readme(org, repo_name)
         data['pull_requests'][repo_name] = get_pull_requests(org, repo_name)
         data['pr_reviews'][repo_name] = {}
         data['pr_comments'][repo_name] = {}
@@ -290,7 +273,7 @@ def load_cache(org):
             return json.load(f)
     return None
 
-def main(org, use_cache=False, update_cache=False):
+def main(org, months, repos, use_cache=False, update_cache=False):
     if use_cache and not update_cache:
         data = load_cache(org)
         if data:
@@ -300,9 +283,9 @@ def main(org, use_cache=False, update_cache=False):
             use_cache = False
 
     if not use_cache or update_cache:
-        # Set the time range for data collection (last 6 months)
+        # Set the time range for data collection
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=180)
+        start_date = end_date - timedelta(days=30*months)
         since = start_date.isoformat()
 
         print(f"\nFetching data from GitHub API for organization: {org}")
@@ -310,9 +293,9 @@ def main(org, use_cache=False, update_cache=False):
         save_cache(data, org)
         print("Data fetched and cached")
 
-    # Always use the last 6 months for analysis, even if cached data is older
+    # Always use the specified time range for analysis, even if cached data is older
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=180)
+    start_date = end_date - timedelta(days=30*months)
     since = start_date.isoformat()
 
     df_developers, df_repos = analyze_data(data, since)
@@ -326,6 +309,8 @@ def main(org, use_cache=False, update_cache=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GitHub Metrics Script")
     parser.add_argument("org", help="GitHub organization name")
+    parser.add_argument("--months", type=int, default=3, help="Number of months to analyze (default: 3)")
+    parser.add_argument("--repos", type=int, default=20, help="Number of top repositories to analyze (default: 20)")
     parser.add_argument("--use-cache", action="store_true", help="Use cached data if available")
     parser.add_argument("--update-cache", action="store_true", help="Update the cache with fresh data")
     args = parser.parse_args()
@@ -336,4 +321,6 @@ if __name__ == "__main__":
 
     print(f"Using token: {GITHUB_TOKEN[:4]}...{GITHUB_TOKEN[-4:]}")
     print(f"Organization: {args.org}")
-    main(args.org, use_cache=args.use_cache, update_cache=args.update_cache)
+    print(f"Analyzing data for the last {args.months} months")
+    print(f"Analyzing top {args.repos} repositories")
+    main(args.org, args.months, args.repos, use_cache=args.use_cache, update_cache=args.update_cache)
