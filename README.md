@@ -1,12 +1,13 @@
 # GitHub Organization Metrics
 
-This Python script fetches and analyzes metrics for a specified GitHub organization, providing insights into repository activity and developer contributions.
+This Python script fetches and analyzes metrics for a specified GitHub organization, providing insights into repository activity and developer contributions. It focuses on the top repositories that were changed within a specified time frame.
 
 ## Features
 
-- Fetches data for all repositories in a specified GitHub organization
+- Fetches data for the top repositories in a specified GitHub organization
 - Analyzes developer activity (commits, lines added/deleted)
 - Provides detailed repository metrics (activity, creation date, last update, language, etc.)
+- Allows customization of the number of months to analyze and the number of top repositories to consider
 - Caches data to reduce API calls and allow for quick re-analysis
 - Outputs results to CSV files for further analysis
 
@@ -37,8 +38,8 @@ python3.8 -m pip install --upgrade pip
 
 1. Clone the repository:
    ```
-   git clone https://github.com/your-username/github-org-metrics-python.git
-   cd github-org-metrics-python
+   git clone https://github.com/your-username/github-org-metrics.git
+   cd github-org-metrics
    ```
 
 2. Create and activate a virtual environment:
@@ -70,18 +71,24 @@ python3.8 -m pip install --upgrade pip
 Ensure your virtual environment is activated, then run the script using the following command:
 
 ```
-python3.8 github_metrics.py <organization_name> [--use-cache] [--update-cache]
+python3.8 github_metrics.py <organization_name> [--months MONTHS] [--repos REPOS] [--use-cache] [--update-cache]
 ```
 
 Arguments:
 - `<organization_name>`: The name of the GitHub organization you want to analyze (required)
+- `--months MONTHS`: Number of months to analyze (default: 3)
+- `--repos REPOS`: Number of top repositories to analyze (default: 20)
 - `--use-cache`: Use cached data if available (optional)
 - `--update-cache`: Update the cache with fresh data (optional)
 
 Examples:
-- To fetch new data for an organization:
+- To fetch new data for an organization's top 20 repos in the last 3 months:
   ```
   python3.8 github_metrics.py MyOrgName
+  ```
+- To analyze the top 10 repos from the last 6 months:
+  ```
+  python3.8 github_metrics.py MyOrgName --months 6 --repos 10
   ```
 - To use cached data (if available):
   ```
@@ -99,7 +106,8 @@ The script generates two CSV files:
 1. `<org_name>_github_developer_metrics.csv`: Contains metrics for each developer, including:
    - Number of commits
    - Lines added and deleted
-   - Top 8 repositories contributed to (sorted by number of commits)
+   - PRs opened, reviewed, and commented on
+   - Top repositories contributed to
 
 2. `<org_name>_github_repository_metrics.csv`: Contains metrics for each repository, including:
    - Repository name
@@ -120,11 +128,12 @@ The script uses a JSON file (`<org_name>_github_data_cache.json`) to store raw d
 
 ## Customization
 
-- The script currently analyzes data from the last 6 months. To change this, modify the `timedelta(days=180)` in the `main()` function.
+- You can adjust the number of months to analyze and the number of top repositories to consider using the `--months` and `--repos` arguments.
+- The script focuses on repositories that have been pushed to within the specified time frame.
 
 ## Limitations
 
-- The script may take a while to run for large organizations with many repositories.
+- The script may take a while to run for large organizations with many active repositories.
 - It's subject to GitHub API rate limits.
 - Some data may not be available depending on the permissions of your Personal Access Token.
 
@@ -133,7 +142,7 @@ The script uses a JSON file (`<org_name>_github_data_cache.json`) to store raw d
 If you encounter issues:
 1. Ensure your GitHub token has the necessary permissions.
 2. Check that you're not hitting GitHub's API rate limits.
-3. For large organizations, consider running the script in parts or reducing the time range analyzed.
+3. For large organizations, consider reducing the number of repositories or the time range analyzed.
 4. If you're having dependency issues, try updating your dependencies:
    ```
    pip3 install --upgrade -r requirements.txt
