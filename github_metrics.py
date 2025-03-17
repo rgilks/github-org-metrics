@@ -146,6 +146,41 @@ def analyze_data(data, since):
     pr_merge_times = []
     branch_lifetimes = []
     
+    # Debug counters
+    total_prs_processed = 0
+    total_reviews_found = 0
+    total_comments_found = 0
+    
+    # Fix: Pre-count all PR reviews and comments by user
+    for repo_name in data['pr_reviews']:
+        for pr_number in data['pr_reviews'][repo_name]:
+            pr_reviews_list = data['pr_reviews'][repo_name].get(pr_number, []) or []
+            for review in pr_reviews_list:
+                if review and review.get('user') and 'login' in review['user']:
+                    # Filter reviews by date
+                    if 'submitted_at' in review:
+                        review_date = datetime.strptime(review['submitted_at'], "%Y-%m-%dT%H:%M:%SZ").isoformat()
+                        if review_date >= since:
+                            reviewer = review['user']['login']
+                            pr_reviews[reviewer] += 1
+                            total_reviews_found += 1
+    
+    for repo_name in data['pr_comments']:
+        for pr_number in data['pr_comments'][repo_name]:
+            pr_comments_list = data['pr_comments'][repo_name].get(pr_number, []) or []
+            for comment in pr_comments_list:
+                if comment and comment.get('user') and 'login' in comment['user']:
+                    # Filter comments by date
+                    if 'created_at' in comment:
+                        comment_date = datetime.strptime(comment['created_at'], "%Y-%m-%dT%H:%M:%SZ").isoformat()
+                        if comment_date >= since:
+                            commenter = comment['user']['login']
+                            pr_comments[commenter] += 1
+                            total_comments_found += 1
+    
+    print(f"DEBUG: Pre-counted {total_reviews_found} reviews ({len(pr_reviews)} reviewers)")
+    print(f"DEBUG: Pre-counted {total_comments_found} comments ({len(pr_comments)} commenters)")
+    
     for repo in data['repos']:
         repo_name = repo['name']
         repo_details.append({
@@ -172,28 +207,33 @@ def analyze_data(data, since):
         
         for pr in data['pull_requests'][repo_name]:
             if pr['user'] and 'login' in pr['user']:
-                author = pr['user']['login']
-                pr_counts[author] += 1
+                pr_number = pr['number']
                 
-                if pr['merged_at']:
-                    created_at = datetime.strptime(pr['created_at'], "%Y-%m-%dT%H:%M:%SZ")
-                    merged_at = datetime.strptime(pr['merged_at'], "%Y-%m-%dT%H:%M:%SZ")
-                    pr_merge_times.append((merged_at - created_at).total_seconds() / 3600)  # in hours
+                # Only count PRs created or updated within the time period
+                pr_created_at = datetime.strptime(pr['created_at'], "%Y-%m-%dT%H:%M:%SZ").isoformat()
+                pr_updated_at = datetime.strptime(pr['updated_at'], "%Y-%m-%dT%H:%M:%SZ").isoformat()
+                
+                # Only include PRs that were created or updated since the specified date
+                if pr_created_at >= since or pr_updated_at >= since:
+                    author = pr['user']['login']
+                    pr_counts[author] += 1
                     
-                    # Calculate branch lifetime
-                    branch_created_at = datetime.strptime(pr['head']['repo']['created_at'], "%Y-%m-%dT%H:%M:%SZ")
-                    branch_lifetimes.append((merged_at - branch_created_at).total_seconds() / 3600)  # in hours
-            
-            pr_number = pr['number']
-            for review in data['pr_reviews'][repo_name].get(pr_number, []):
-                if review['user'] and 'login' in review['user']:
-                    reviewer = review['user']['login']
-                    pr_reviews[reviewer] += 1
-            
-            for comment in data['pr_comments'][repo_name].get(pr_number, []):
-                if comment['user'] and 'login' in comment['user']:
-                    commenter = comment['user']['login']
-                    pr_comments[commenter] += 1
+                    if pr['merged_at']:
+                        created_at = datetime.strptime(pr['created_at'], "%Y-%m-%dT%H:%M:%SZ")
+                        merged_at = datetime.strptime(pr['merged_at'], "%Y-%m-%dT%H:%M:%SZ")
+                        pr_merge_times.append((merged_at - created_at).total_seconds() / 3600)  # in hours
+                        
+                        # Calculate branch lifetime
+                        branch_created_at = datetime.strptime(pr['head']['repo']['created_at'], "%Y-%m-%dT%H:%M:%SZ")
+                        branch_lifetimes.append((merged_at - branch_created_at).total_seconds() / 3600)  # in hours
+                
+                total_prs_processed += 1
+
+    print(f"DEBUG: Processed {total_prs_processed} PRs")
+    print(f"DEBUG: Found {total_reviews_found} reviews during analysis")
+    print(f"DEBUG: Found {total_comments_found} comments during analysis")
+    print(f"DEBUG: PR Reviews counter has {sum(pr_reviews.values())} entries")
+    print(f"DEBUG: PR Comments counter has {sum(pr_comments.values())} entries")
 
     def format_repos(repos_dict):
         sorted_repos = sorted(repos_dict.items(), key=lambda x: x[1], reverse=True)
@@ -205,14 +245,14 @@ def analyze_data(data, since):
             return f"{top_5} +{remaining} more"
 
     df_developers = pd.DataFrame({
-        'Developer': list(commit_counts.keys()),
-        'Commits': list(commit_counts.values()),
-        'Lines Added': [lines_added[dev] for dev in commit_counts.keys()],
-        'Lines Deleted': [lines_deleted[dev] for dev in commit_counts.keys()],
-        'PRs Opened': [pr_counts[dev] for dev in commit_counts.keys()],
-        'PRs Reviewed': [pr_reviews[dev] for dev in commit_counts.keys()],
-        'PR Comments': [pr_comments[dev] for dev in commit_counts.keys()],
-        'Repositories': [format_repos(repos_worked_on[dev]) for dev in commit_counts.keys()]
+        'Developer': list(set(list(commit_counts.keys()) + list(pr_reviews.keys()) + list(pr_comments.keys()))),
+        'Commits': [commit_counts.get(dev, 0) for dev in set(list(commit_counts.keys()) + list(pr_reviews.keys()) + list(pr_comments.keys()))],
+        'Lines Added': [lines_added.get(dev, 0) for dev in set(list(commit_counts.keys()) + list(pr_reviews.keys()) + list(pr_comments.keys()))],
+        'Lines Deleted': [lines_deleted.get(dev, 0) for dev in set(list(commit_counts.keys()) + list(pr_reviews.keys()) + list(pr_comments.keys()))],
+        'PRs Opened': [pr_counts.get(dev, 0) for dev in set(list(commit_counts.keys()) + list(pr_reviews.keys()) + list(pr_comments.keys()))],
+        'PRs Reviewed': [pr_reviews.get(dev, 0) for dev in set(list(commit_counts.keys()) + list(pr_reviews.keys()) + list(pr_comments.keys()))],
+        'PR Comments': [pr_comments.get(dev, 0) for dev in set(list(commit_counts.keys()) + list(pr_reviews.keys()) + list(pr_comments.keys()))],
+        'Repositories': [format_repos(repos_worked_on.get(dev, {})) for dev in set(list(commit_counts.keys()) + list(pr_reviews.keys()) + list(pr_comments.keys()))]
     })
 
     df_developers = df_developers.sort_values('Commits', ascending=False)
@@ -278,6 +318,19 @@ def main(org, months, repos, use_cache=False, update_cache=False):
         data = load_cache(org)
         if data:
             print("Using cached data")
+            
+            # Debug: check if there are any PR reviews and comments in the cache
+            review_count = 0
+            comment_count = 0
+            for repo_name in data['pr_reviews']:
+                for pr_number in data['pr_reviews'][repo_name]:
+                    review_count += len(data['pr_reviews'][repo_name][pr_number] or [])
+            
+            for repo_name in data['pr_comments']:
+                for pr_number in data['pr_comments'][repo_name]:
+                    comment_count += len(data['pr_comments'][repo_name][pr_number] or [])
+            
+            print(f"DEBUG: Found {review_count} reviews and {comment_count} comments in cache")
         else:
             print("Cache not found, fetching new data")
             use_cache = False
