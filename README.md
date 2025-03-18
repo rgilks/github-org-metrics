@@ -20,46 +20,53 @@ This Python script fetches and analyzes metrics for a specified GitHub organizat
 ## Installing Python
 
 If you are on macos install homebrew is it's not already installed
+
 ```
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
 Install python3.8
+
 ```
 brew install python@3.8
 ```
 
 Install pip
+
 ```
 python3.8 -m pip install --upgrade pip
-```   
+```
 
 ## Installation and Setup
 
 1. Clone the repository:
+
    ```
    git clone https://github.com/your-username/github-org-metrics.git
    cd github-org-metrics
    ```
 
 2. Create and activate a virtual environment:
+
    ```
    python3.8 -m venv myenv
    source myenv/bin/activate
    ```
 
 3. Install the required dependencies:
+
    ```
    pip3 install -r requirements.txt
    ```
 
 4. Set up your GitHub Personal Access Token:
+
    - Go to GitHub Settings > Developer Settings > Personal Access Tokens > Fine-grained tokens
    - Create a new token with the following permissions:
      - Organization permissions:
-       * Read access to members and organization administration
+       - Read access to members and organization administration
      - Repository permissions:
-       * Read access to code and metadata
+       - Read access to code and metadata
 
 5. Set your token as an environment variable:
    ```
@@ -71,17 +78,20 @@ python3.8 -m pip install --upgrade pip
 Ensure your virtual environment is activated, then run the script using the following command:
 
 ```
-python3.8 github_metrics.py <organization_name> [--months MONTHS] [--repos REPOS] [--use-cache] [--update-cache]
+python3.8 github_metrics.py <organization_name> [--months MONTHS] [--repos REPOS] [--use-cache] [--update-cache] [--target-repos REPOS]
 ```
 
 Arguments:
+
 - `<organization_name>`: The name of the GitHub organization you want to analyze (required)
 - `--months MONTHS`: Number of months to analyze (default: 3)
 - `--repos REPOS`: Number of top repositories to analyze (default: 20)
 - `--use-cache`: Use cached data if available (optional)
 - `--update-cache`: Update the cache with fresh data (optional)
+- `--target-repos REPOS`: Comma-separated list of repositories to analyze (optional)
 
 Examples:
+
 - To fetch new data for an organization's top 20 repos in the last 3 months:
   ```
   python3.8 github_metrics.py MyOrgName
@@ -98,12 +108,17 @@ Examples:
   ```
   python3.8 github_metrics.py MyOrgName --update-cache
   ```
+- To analyze specific repositories:
+  ```
+  python3.8 github_metrics.py MyOrgName --target-repos repo-a repo-b
+  ```
 
 ## Output
 
 The script generates two CSV files:
 
 1. `<org_name>_github_developer_metrics.csv`: Contains metrics for each developer, including:
+
    - Number of commits
    - Lines added and deleted
    - PRs opened, reviewed, and commented on
@@ -122,6 +137,7 @@ The script also prints a formatted version of these results to the console.
 ## Caching
 
 The script uses a JSON file (`<org_name>_github_data_cache.json`) to store raw data. This allows for:
+
 - Quick re-running of analyses without making API calls
 - Experimentation with different analysis methods on the same dataset
 - Maintenance of a historical record of your GitHub data
@@ -140,6 +156,7 @@ The script uses a JSON file (`<org_name>_github_data_cache.json`) to store raw d
 ## Troubleshooting
 
 If you encounter issues:
+
 1. Ensure your GitHub token has the necessary permissions.
 2. Check that you're not hitting GitHub's API rate limits.
 3. For large organizations, consider reducing the number of repositories or the time range analyzed.
