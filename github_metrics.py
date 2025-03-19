@@ -25,8 +25,8 @@ def make_request(url):
                 return response.json()
             elif response.status_code == 403 and 'X-RateLimit-Remaining' in response.headers and int(response.headers['X-RateLimit-Remaining']) == 0:
                 reset_time = int(response.headers['X-RateLimit-Reset'])
-                sleep_time = reset_time - time.time() + 1
-                print(f"Rate limit exceeded. Sleeping for {sleep_time} seconds.")
+                sleep_time = max(1, reset_time - time.time() + 1)  # Ensure sleep time is at least 1 second
+                print(f"Rate limit exceeded. Sleeping for {sleep_time:.2f} seconds.")
                 time.sleep(sleep_time)
             elif response.status_code == 403 and "Resource not accessible by personal access token" in response.text:
                 print(f"Permission error for {url}: Your token doesn't have access to this resource.")
