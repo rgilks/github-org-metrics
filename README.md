@@ -19,22 +19,22 @@ This Python script fetches and analyzes metrics for a specified GitHub organizat
 
 ## Installing Python
 
-If you are on macos install homebrew is it's not already installed
+If you are on macos install homebrew if it's not already installed
 
 ```
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-Install python3.8
+Install python
 
 ```
-brew install python@3.8
+brew install python
 ```
 
-Install pip
-
+If you install python with homebrew then there's no need to install pip separately.
+However if you have a non-homebrew python installation then install pip with:
 ```
-python3.8 -m pip install --upgrade pip
+python3 -m pip install --upgrade pip
 ```
 
 ## Installation and Setup
@@ -49,24 +49,30 @@ python3.8 -m pip install --upgrade pip
 2. Create and activate a virtual environment:
 
    ```
-   python3.8 -m venv myenv
+   python3 -m venv myenv
    source myenv/bin/activate
    ```
 
 3. Install the required dependencies:
 
    ```
-   pip3 install -r requirements.txt
+   pip install -r requirements.txt
    ```
 
 4. Set up your GitHub Personal Access Token:
 
    - Go to GitHub Settings > Developer Settings > Personal Access Tokens > Fine-grained tokens
    - Create a new token with the following permissions:
-     - Organization permissions:
-       - Read access to members and organization administration
      - Repository permissions:
-       - Read access to code and metadata
+       - Actions: Read-only
+       - Contents: Read-only
+       - Deployments: Read-only
+       - Issues: Read-only
+       - Metadata: Read-only
+       - Pull Requests: Read-only
+     - Organization permissions:
+       - Administration: Read-only
+       - Members: Read-only
 
 5. Set your token as an environment variable:
    ```
@@ -78,7 +84,7 @@ python3.8 -m pip install --upgrade pip
 Ensure your virtual environment is activated, then run the script using the following command:
 
 ```
-python3.8 github_metrics.py <organization_name> [--months MONTHS] [--repos REPOS] [--use-cache] [--update-cache] [--target-repos REPOS]
+python3 github_metrics.py <organization_name> [--months MONTHS] [--repos REPOS] [--use-cache] [--update-cache] [--target-repos REPOS]
 ```
 
 Arguments:
@@ -94,23 +100,23 @@ Examples:
 
 - To fetch new data for an organization's top 20 repos in the last 3 months:
   ```
-  python3.8 github_metrics.py MyOrgName
+  python3 github_metrics.py MyOrgName
   ```
 - To analyze the top 10 repos from the last 6 months:
   ```
-  python3.8 github_metrics.py MyOrgName --months 6 --repos 10
+  python3 github_metrics.py MyOrgName --months 6 --repos 10
   ```
 - To use cached data (if available):
   ```
-  python3.8 github_metrics.py MyOrgName --use-cache
+  python3 github_metrics.py MyOrgName --use-cache
   ```
 - To update the cache with fresh data:
   ```
-  python3.8 github_metrics.py MyOrgName --update-cache
+  python3 github_metrics.py MyOrgName --update-cache
   ```
 - To analyze specific repositories:
   ```
-  python3.8 github_metrics.py MyOrgName --target-repos repo-a repo-b
+  python3 github_metrics.py MyOrgName --target-repos repo-a repo-b
   ```
 
 ## Output
@@ -162,7 +168,7 @@ If you encounter issues:
 3. For large organizations, consider reducing the number of repositories or the time range analyzed.
 4. If you're having dependency issues, try updating your dependencies:
    ```
-   pip3 install --upgrade -r requirements.txt
+   pip install --upgrade -r requirements.txt
    ```
 
 ## License
